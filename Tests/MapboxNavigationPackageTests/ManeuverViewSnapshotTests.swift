@@ -47,6 +47,34 @@ class ManeuverViewSnapshotTests: TestCase {
         assertImageSnapshot(matching: maneuverView.layer, as: .image(precision: 0.99))
     }
 
+    func testLeftTurnImageRepresentationBakesMirroringIntoPixels() throws {
+        maneuverView.visualInstruction = maneuverInstruction(.turn, .left)
+        maneuverView.setNeedsDisplay()
+        maneuverView.layoutIfNeeded()
+
+        let leftImage = try XCTUnwrap(maneuverView.imageRepresentation)
+
+        XCTAssertEqual(
+            leftImage.imageOrientation,
+            .up,
+            "CarPlay ignores UIImage orientation metadata, so mirrored maneuver pixels must be baked."
+        )
+
+        maneuverView.visualInstruction = maneuverInstruction(.turn, .right)
+        maneuverView.setNeedsDisplay()
+        maneuverView.layoutIfNeeded()
+
+        let rightImage = try XCTUnwrap(maneuverView.imageRepresentation)
+        let leftPixels = try XCTUnwrap(leftImage.cgImage?.dataProvider?.data) as Data
+        let rightPixels = try XCTUnwrap(rightImage.cgImage?.dataProvider?.data) as Data
+
+        XCTAssertNotEqual(
+            leftPixels,
+            rightPixels,
+            "The left-turn bitmap must contain mirrored pixels instead of right-turn pixels plus orientation metadata."
+        )
+    }
+
     func testTurnSlightRight() {
         maneuverView.visualInstruction = maneuverInstruction(.turn, .slightRight)
         assertImageSnapshot(matching: maneuverView.layer, as: .image(precision: 0.99))

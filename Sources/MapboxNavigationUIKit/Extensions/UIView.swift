@@ -16,16 +16,20 @@ extension UIView {
     var imageRepresentation: UIImage? {
         let size = CGSize(width: frame.size.width, height: frame.size.height)
         UIGraphicsBeginImageContextWithOptions(size, false, (window?.screen ?? UIScreen.main).scale)
+        defer { UIGraphicsEndImageContext() }
         guard let currentContext = UIGraphicsGetCurrentContext() else { return nil }
-        layer.render(in: currentContext)
-        let image = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
 
-        // Check the transform property to see if the view was flipped.
-        // If it was then we need to apply a flip transform here as well since layer.render() ignores the view's
-        // transform when it is rendered
+        // `layer.render(in:)` ignores the view's transform. Bake horizontal mirroring into the
+        // rendered pixels because external displays such as CarPlay may ignore UIImage orientation
+        // metadata and otherwise show left-turn maneuvers as right turns.
         let isFlipped = transform.a == -1
-        return isFlipped ? image?.withHorizontallyFlippedOrientation() : image
+        if isFlipped {
+            currentContext.translateBy(x: size.width, y: 0)
+            currentContext.scaleBy(x: -1, y: 1)
+        }
+
+        layer.render(in: currentContext)
+        return UIGraphicsGetImageFromCurrentImageContext()
     }
 
     // MARK: Animating
