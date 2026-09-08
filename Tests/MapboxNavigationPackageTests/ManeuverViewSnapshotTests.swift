@@ -37,6 +37,53 @@ class ManeuverViewSnapshotTests: TestCase {
         )
     }
 
+    private func freshManeuverImage(direction: ManeuverDirection) throws -> UIImage {
+        let view = ManeuverView(frame: maneuverView.frame)
+        view.backgroundColor = .white
+        view.visualInstruction = maneuverInstruction(.turn, direction)
+        return try XCTUnwrap(view.imageRepresentation)
+    }
+
+    private func assertHorizontalMirror(
+        _ mirroredImage: UIImage,
+        of sourceImage: UIImage,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let mirrored = try XCTUnwrap(mirroredImage.cgImage, file: file, line: line)
+        let source = try XCTUnwrap(sourceImage.cgImage, file: file, line: line)
+        guard mirrored.width == source.width,
+              mirrored.height == source.height,
+              mirrored.bitsPerPixel == source.bitsPerPixel
+        else {
+            XCTFail("Mirrored and source images must have matching pixel layouts.", file: file, line: line)
+            return
+        }
+
+        let mirroredData = try XCTUnwrap(mirrored.dataProvider?.data, file: file, line: line) as Data
+        let sourceData = try XCTUnwrap(source.dataProvider?.data, file: file, line: line) as Data
+        let mirroredBytes = [UInt8](mirroredData)
+        let sourceBytes = [UInt8](sourceData)
+        let bytesPerPixel = mirrored.bitsPerPixel / 8
+
+        for y in 0..<mirrored.height {
+            for x in 0..<mirrored.width {
+                let mirroredOffset = y * mirrored.bytesPerRow + x * bytesPerPixel
+                let sourceOffset = y * source.bytesPerRow + (source.width - x - 1) * bytesPerPixel
+                for component in 0..<bytesPerPixel where
+                    mirroredBytes[mirroredOffset + component] != sourceBytes[sourceOffset + component]
+                {
+                    XCTFail(
+                        "Left-turn pixels must be the exact horizontal mirror of right-turn pixels.",
+                        file: file,
+                        line: line
+                    )
+                    return
+                }
+            }
+        }
+    }
+
     func testStraightRoundabout() {
         maneuverView.visualInstruction = maneuverInstruction(.takeRoundabout, .straightAhead)
         assertImageSnapshot(matching: maneuverView.layer, as: .image(precision: 0.99))
@@ -48,23 +95,14 @@ class ManeuverViewSnapshotTests: TestCase {
     }
 
     func testLeftTurnImageRepresentationBakesMirroringIntoPixels() throws {
-        maneuverView.visualInstruction = maneuverInstruction(.turn, .left)
-        maneuverView.setNeedsDisplay()
-        maneuverView.layoutIfNeeded()
-
-        let leftImage = try XCTUnwrap(maneuverView.imageRepresentation)
+        let leftImage = try freshManeuverImage(direction: .left)
+        let rightImage = try freshManeuverImage(direction: .right)
 
         XCTAssertEqual(
             leftImage.imageOrientation,
             .up,
             "CarPlay ignores UIImage orientation metadata, so mirrored maneuver pixels must be baked."
         )
-
-        maneuverView.visualInstruction = maneuverInstruction(.turn, .right)
-        maneuverView.setNeedsDisplay()
-        maneuverView.layoutIfNeeded()
-
-        let rightImage = try XCTUnwrap(maneuverView.imageRepresentation)
         let leftPixels = try XCTUnwrap(leftImage.cgImage?.dataProvider?.data) as Data
         let rightPixels = try XCTUnwrap(rightImage.cgImage?.dataProvider?.data) as Data
 
@@ -73,6 +111,7 @@ class ManeuverViewSnapshotTests: TestCase {
             rightPixels,
             "The left-turn bitmap must contain mirrored pixels instead of right-turn pixels plus orientation metadata."
         )
+        try assertHorizontalMirror(leftImage, of: rightImage)
     }
 
     func testTurnSlightRight() {

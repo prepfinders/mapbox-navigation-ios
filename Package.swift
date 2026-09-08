@@ -51,10 +51,6 @@ let package = Package(
         .package(url: "https://github.com/mapbox/turf-swift.git", exact: "4.0.0"),
         .package(url: "https://github.com/AliSoftware/OHHTTPStubs", from: "9.1.0"),
         .package(url: "https://github.com/pointfreeco/swift-snapshot-testing.git", from: "1.18.1"),
-        // Keep SnapshotTesting's CustomDump dependency on the last release that shares
-        // XCTestDynamicOverlay's IssueReporting targets. Newer releases introduce a second
-        // package with the same target names and cannot resolve beside Supabase 2.x.
-        .package(url: "https://github.com/pointfreeco/swift-custom-dump", exact: "1.6.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.0.0"),
     ].updatedWithBetaFeatures(),
     targets: [

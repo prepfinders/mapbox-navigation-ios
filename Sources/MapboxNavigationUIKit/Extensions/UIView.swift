@@ -19,16 +19,21 @@ extension UIView {
         defer { UIGraphicsEndImageContext() }
         guard let currentContext = UIGraphicsGetCurrentContext() else { return nil }
 
-        // `layer.render(in:)` ignores the view's transform. Bake horizontal mirroring into the
-        // rendered pixels because external displays such as CarPlay may ignore UIImage orientation
-        // metadata and otherwise show left-turn maneuvers as right turns.
-        let isFlipped = transform.a == -1
-        if isFlipped {
+        // Rendering first gives custom drawing code a chance to update the view transform.
+        layer.render(in: currentContext)
+
+        // `layer.render(in:)` ignores the view's transform. If drawing requested a horizontal
+        // mirror, render again with that mirror baked into the pixels because external displays
+        // such as CarPlay may ignore UIImage orientation metadata.
+        if transform.a == -1 {
+            currentContext.clear(CGRect(origin: .zero, size: size))
+            currentContext.saveGState()
             currentContext.translateBy(x: size.width, y: 0)
             currentContext.scaleBy(x: -1, y: 1)
+            layer.render(in: currentContext)
+            currentContext.restoreGState()
         }
 
-        layer.render(in: currentContext)
         return UIGraphicsGetImageFromCurrentImageContext()
     }
 
